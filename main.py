@@ -3,6 +3,15 @@ from tkinter import ttk, messagebox
 import random
 from openpyxl import Workbook
 
+
+# Función uniforme global
+def uniforme(a: int, b: int, rnd: float) -> float:
+    return round(a + rnd * (b - a), 4)
+
+
+# Función uniforme global
+
+
 class SimuladorApp:
     def __init__(self, root):
         self.root = root
@@ -24,7 +33,8 @@ class SimuladorApp:
         self.entry_i.grid(row=0, column=3, padx=5)
         self.entry_j.grid(row=0, column=5, padx=5)
 
-        tk.Button(self.param_frame, text="Simular", command=self.simular).grid(row=0, column=6, padx=10)
+        self.simular_btn = tk.Button(self.param_frame, text="Simular", command=self.simular)
+        self.simular_btn.grid(row=0, column=6, padx=10)
         tk.Button(self.param_frame, text="Exportar a Excel", command=self.exportar_excel).grid(row=0, column=7, padx=10)
 
         # ----- FRAME PARA PARÁMETROS VARIABLES -----
@@ -66,18 +76,33 @@ class SimuladorApp:
         self.tree.configure(yscroll=scrollbar.set)
         scrollbar.pack(side='right', fill='y')
 
+        self.progress = ttk.Progressbar(root, orient="horizontal", length=400, mode="determinate")
+        self.progress.pack(pady=5)
+
         self.result_label = tk.Label(root, text="")
         self.result_label.pack(pady=10)
 
         self.datos_simulados = []
 
+    def uniforme(a: int, b: int, rnd: float) -> float:
+        return round(a + rnd * (b - a), 4)
+
     def simular_dia(self, dia, fila_anterior, produccion, demanda_posible, probabilidades, precio_por_demanda):
-        clientes = random.randint(10, 30)
+        #print(f"🧾 Día {dia} - Producción: {produccion} pastelitos")
+        demandas_clientes = []
+        rnds_demandas = []
+        rnd_clientes = random.random()
+        clientes = int(uniforme(10, 30, rnd_clientes))
+        #print(f"Random generado para clientes: {rnd_clientes} → Clientes: {clientes}")
         demanda_total = 0
         ingresos = 0
 
         for _ in range(clientes):
+
+            rnd_demanda = random.random()
+            rnds_demandas.append(rnd_demanda)
             demanda = random.choices(demanda_posible, probabilidades)[0]
+            demandas_clientes.append(demanda)
             precio = precio_por_demanda[demanda]
             ingresos += min(demanda, produccion - demanda_total) * precio
             demanda_total += demanda
@@ -90,7 +115,14 @@ class SimuladorApp:
         costo_total = produccion * costo_unitario
         ganancia = ingresos - costo_total
 
-        acum_sobrantes = fila_anterior['Acum. Sobrantes'] + sobrantes if 'Acum. Sobrantes' in fila_anterior else sobrantes
+        #print(f"Clientes: {clientes}")
+        #print(f"Demandas generadas: {demandas_clientes}")
+        #precios_asociados = [precio_por_demanda[d] for d in demandas_clientes]
+        #print(f"Precios asociados: {precios_asociados}")
+        #print(f"Randoms usados para demanda: {rnds_demandas}")
+
+        acum_sobrantes = fila_anterior[
+                             'Acum. Sobrantes'] + sobrantes if 'Acum. Sobrantes' in fila_anterior else sobrantes
         acum_ganancia = fila_anterior['Acum. Ganancia'] + ganancia if 'Acum. Ganancia' in fila_anterior else ganancia
 
         prom_sobrantes = acum_sobrantes / dia
@@ -113,6 +145,9 @@ class SimuladorApp:
         }
 
     def simular(self):
+        self.simular_btn.config(state='disabled')
+        self.result_label.config(text='⏳ Simulando...')
+        #print("📦 Precios por unidad según demanda ingresados:")
         self.tree.delete(*self.tree.get_children())
         try:
             n = int(self.entry_n.get())
@@ -122,25 +157,35 @@ class SimuladorApp:
             precios = [int(e.get()) for e in self.precio_entries]
         except ValueError:
             self.result_label.config(text="⚠️ Ingresá valores numéricos válidos.")
+            self.progress["value"] = 0
+            self.simular_btn.config(state='normal')
             return
 
         if not (1 <= i <= j <= n):
             self.result_label.config(text="⚠️ El rango debe cumplir: 1 ≤ i ≤ j ≤ N.")
+            self.simular_btn.config(state='normal')
             return
 
         if abs(sum(probabilidades) - 1.0) > 0.01:
             self.result_label.config(text="⚠️ La suma de probabilidades debe ser 1.0")
+            self.simular_btn.config(state='normal')
             return
 
         demanda_posible = self.demandas
         precio_por_demanda = dict(zip(demanda_posible, precios))
+        for d in demanda_posible:
+            print(f"Demanda {d}: ${precio_por_demanda[d]}")
 
         self.datos_simulados = []
         fila_anterior = {'Sobrantes': 0, 'Acum. Sobrantes': 0, 'Acum. Ganancia': 0}
 
+        self.progress["maximum"] = n
         for dia in range(1, n + 1):
-            produccion = 180 if fila_anterior['Sobrantes'] > 50 else 200
-            fila_actual = self.simular_dia(dia, fila_anterior, produccion, demanda_posible, probabilidades, precio_por_demanda)
+            produccion = 200
+            fila_actual = self.simular_dia(dia, fila_anterior, produccion, demanda_posible, probabilidades,
+                                           precio_por_demanda)
+            self.progress["value"] = dia
+            self.root.update_idletasks()
             self.datos_simulados.append(fila_actual)
             fila_anterior = fila_actual
 
@@ -155,7 +200,9 @@ class SimuladorApp:
         texto_resultado = f"📊 Última fila (Día {ultima['Día']}): Ganancia ${ultima['Ganancia']}, Sobrantes: {ultima['Sobrantes']}\n"
         texto_resultado += f"Promedio de sobrantes por día: {promedio_sobrantes:.2f} pastelitos\n"
         texto_resultado += f"Promedio de ganancia por día: ${promedio_ganancia:.2f}"
+        self.progress["value"] = 0
         self.result_label.config(text=texto_resultado)
+        self.simular_btn.config(state='normal')
 
     def exportar_excel(self):
         if not self.datos_simulados:
@@ -178,8 +225,8 @@ class SimuladorApp:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar el archivo:\n{e}")
 
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = SimuladorApp(root)
     root.mainloop()
-
