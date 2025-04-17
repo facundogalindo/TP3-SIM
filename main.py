@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import random
 from openpyxl import Workbook
-
+from tkinter import filedialog
 
 # Función uniforme global
 def uniforme(a: int, b: int, rnd: float) -> float:
@@ -220,8 +220,16 @@ class SimuladorApp:
             ws.append([fila[col] for col in encabezados])
 
         try:
-            wb.save("simulacion_pastelitos.xlsx")
-            messagebox.showinfo("Éxito", "Archivo Excel guardado como 'simulacion_pastelitos.xlsx'")
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".xlsx",
+                filetypes=[("Archivos de Excel", "*.xlsx")],
+                title="Guardar archivo como"
+            )
+            if file_path:
+                wb.save(file_path)
+                messagebox.showinfo("Éxito", f"Archivo Excel guardado en:\n{file_path}")
+            else:
+                messagebox.showinfo("Cancelado", "La exportación fue cancelada.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar el archivo:\n{e}")
 
