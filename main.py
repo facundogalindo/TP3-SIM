@@ -1,118 +1,136 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import random
+import pandas as pd
 
-demanda_posible = [1, 2, 5, 6, 7, 8, 10]
-probabilidades = [0.1, 0.2, 0.4, 0.1, 0.1, 0.05, 0.05]
-precio_por_demanda = {1: 100, 2: 100, 5: 100, 6: 80, 7: 80, 8: 80, 10: 80}
+# Configuraciones generales por defecto
+COSTO_PASTELITO = 30
+CANTIDAD_PRODUCCION = 200
+DEMANDAS = [1, 2, 5, 6, 7, 8, 10]
 
-def simular_dia(dia, fila_anterior, produccion):
-    clientes = random.randint(10, 30)
-    demanda_total = 0
-    ingresos = 0
+# Interfaz para ingresar parámetros variables
+def obtener_parametros():
+    probabilidades = []
+    precios = {}
+    try:
+        for i, d in enumerate(DEMANDAS):
+            prob = float(entries_prob[d].get())
+            probabilidades.append(prob)
+            precios[d] = float(entries_precio[d].get())
+        return probabilidades, precios
+    except ValueError:
+        messagebox.showerror("Error", "Probabilidades y precios deben ser números válidos.")
+        return None, None
 
-    for _ in range(clientes):
-        demanda = random.choices(demanda_posible, probabilidades)[0]
-        precio = precio_por_demanda[demanda]
-        ingresos += min(demanda, produccion - demanda_total) * precio
-        demanda_total += demanda
-        if demanda_total >= produccion:
-            break
+def simular_ventas(n_dias, probabilidades, precios):
+    resultados = []
+    for dia in range(1, n_dias + 1):
+        clientes = random.randint(10, 30)
+        demandas = random.choices(DEMANDAS, weights=probabilidades, k=clientes)
+        total_demandado = sum(demandas)
+        total_vendido = min(total_demandado, CANTIDAD_PRODUCCION)
+        sobrantes = max(CANTIDAD_PRODUCCION - total_vendido, 0)
+        ingresos = 0
+        vendidos = 0
+        for d in demandas:
+            if vendidos + d <= CANTIDAD_PRODUCCION:
+                ingresos += precios[d] * d
+                vendidos += d
+            else:
+                break
+        costo = CANTIDAD_PRODUCCION * COSTO_PASTELITO
+        ganancia = ingresos - costo
 
-    vendidos = min(demanda_total, produccion)
-    sobrantes = max(0, produccion - vendidos)
-    costo_unitario = 30
-    costo_total = produccion * costo_unitario
-    ganancia = ingresos - costo_total
+        resultados.append({
+            "Día": dia,
+            "Clientes": clientes,
+            "Demanda Total": total_demandado,
+            "Vendidos": total_vendido,
+            "Sobrantes": sobrantes,
+            "Ingresos": ingresos,
+            "Costo": costo,
+            "Ganancia": ganancia
+        })
+    return pd.DataFrame(resultados)
 
-    return {
-        'Día': dia,
-        'Clientes': clientes,
-        'Demanda Total': demanda_total,
-        'Vendidos': vendidos,
-        'Sobrantes': sobrantes,
-        'Producción': produccion,
-        'Costo Total': costo_total,
-        'Ingresos': ingresos,
-        'Ganancia': ganancia,
-    }
+def mostrar_resultado(df, desde, hasta):
+    for row in tree.get_children():
+        tree.delete(row)
+    df_filtrado = df.iloc[desde:hasta]
+    for _, row in df_filtrado.iterrows():
+        tree.insert("", tk.END, values=list(row))
 
-class SimuladorApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Simulación de Venta de Pastelitos")
-
-        self.param_frame = tk.Frame(root)
-        self.param_frame.pack(pady=10)
-
-        tk.Label(self.param_frame, text="Días a simular (N):").grid(row=0, column=0)
-        tk.Label(self.param_frame, text="Desde iteración (i):").grid(row=0, column=2)
-        tk.Label(self.param_frame, text="Hasta iteración (j):").grid(row=0, column=4)
-
-        self.entry_n = tk.Entry(self.param_frame, width=10)
-        self.entry_i = tk.Entry(self.param_frame, width=10)
-        self.entry_j = tk.Entry(self.param_frame, width=10)
-
-        self.entry_n.grid(row=0, column=1, padx=5)
-        self.entry_i.grid(row=0, column=3, padx=5)
-        self.entry_j.grid(row=0, column=5, padx=5)
-
-        tk.Button(self.param_frame, text="Simular", command=self.simular).grid(row=0, column=6, padx=10)
-
-        self.tree = ttk.Treeview(root, columns=(
-            'Día', 'Clientes', 'Demanda Total', 'Vendidos', 'Sobrantes', 'Producción',
-            'Costo Total', 'Ingresos', 'Ganancia'), show='headings')
-
-        for col in self.tree['columns']:
-            self.tree.heading(col, text=col)
-            self.tree.column(col, anchor='center', width=100)
-
-        self.tree.pack(expand=True, fill='both')
-
-        scrollbar = ttk.Scrollbar(root, orient='vertical', command=self.tree.yview)
-        self.tree.configure(yscroll=scrollbar.set)
-        scrollbar.pack(side='right', fill='y')
-
-        self.result_label = tk.Label(root, text="")
-        self.result_label.pack(pady=10)
-
-    def simular(self):
-        self.tree.delete(*self.tree.get_children())
-        try:
-            n = int(self.entry_n.get())
-            i = int(self.entry_i.get())
-            j = int(self.entry_j.get())
-        except ValueError:
-            self.result_label.config(text="⚠️ Ingresá valores numéricos válidos.")
+def ejecutar_simulacion():
+    try:
+        n = int(entry_n.get())
+        i = int(entry_i.get())
+        j = int(entry_j.get())
+        probabilidades, precios = obtener_parametros()
+        if probabilidades is None:
             return
+        df = simular_ventas(n, probabilidades, precios)
+        mostrar_resultado(df, i, i + j)
 
-        if not (1 <= i <= j <= n):
-            self.result_label.config(text="⚠️ El rango de iteraciones debe ser válido: 1 ≤ i ≤ j ≤ N.")
-            return
+        promedio_sobrantes = df["Sobrantes"].mean()
+        promedio_ganancia = df["Ganancia"].mean()
+        ultima_fila = df.iloc[-1]
 
-        datos_simulados = []
-        fila_anterior = {'Sobrantes': 0}
+        messagebox.showinfo("Resultados", f"Promedio de sobrantes: {promedio_sobrantes:.2f}\nPromedio de ganancia: ${promedio_ganancia:.2f}\n\nÚltimo día:\n{ultima_fila.to_string()}" )
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
 
-        for dia in range(1, n + 1):
-            produccion = 180 if fila_anterior['Sobrantes'] > 50 else 200
-            fila_actual = simular_dia(dia, fila_anterior, produccion)
-            datos_simulados.append(fila_actual)
-            fila_anterior = fila_actual
+# Interfaz Gráfica
+root = tk.Tk()
+root.title("Simulador de Venta de Pastelitos")
+root.geometry("1200x700")
 
-        for fila in datos_simulados[i - 1:j]:
-            valores = [fila[col] for col in self.tree['columns']]
-            self.tree.insert('', 'end', values=valores)
+frame = tk.Frame(root)
+frame.pack(pady=10)
 
-        ultima = datos_simulados[-1]
-        promedio_sobrantes = sum(d['Sobrantes'] for d in datos_simulados) / n
-        promedio_ganancia = sum(d['Ganancia'] for d in datos_simulados) / n
+lbl_n = tk.Label(frame, text="Cantidad de días (N):")
+lbl_n.grid(row=0, column=0)
+entry_n = tk.Entry(frame)
+entry_n.grid(row=0, column=1)
 
-        texto_resultado = f"📊 Última fila (Día {ultima['Día']}): Ganancia ${ultima['Ganancia']}, Sobrantes: {ultima['Sobrantes']}\n"
-        texto_resultado += f"Promedio de sobrantes por día: {promedio_sobrantes:.2f} pastelitos\n"
-        texto_resultado += f"Promedio de ganancia por día: ${promedio_ganancia:.2f}"
-        self.result_label.config(text=texto_resultado)
+lbl_i = tk.Label(frame, text="Mostrar desde la iteración i:")
+lbl_i.grid(row=1, column=0)
+entry_i = tk.Entry(frame)
+entry_i.grid(row=1, column=1)
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = SimuladorApp(root)
-    root.mainloop()
+lbl_j = tk.Label(frame, text="Cantidad de filas a mostrar (j):")
+lbl_j.grid(row=2, column=0)
+entry_j = tk.Entry(frame)
+entry_j.grid(row=2, column=1)
+
+# Entradas de probabilidades y precios
+frame_param = tk.LabelFrame(root, text="Parámetros de Demanda")
+frame_param.pack(padx=10, pady=10)
+
+entries_prob = {}
+entries_precio = {}
+
+for idx, demanda in enumerate(DEMANDAS):
+    tk.Label(frame_param, text=f"Demanda {demanda}").grid(row=0, column=idx+1)
+    tk.Label(frame_param, text="Prob.").grid(row=1, column=0)
+    e_prob = tk.Entry(frame_param, width=6)
+    e_prob.insert(0, str([0.1, 0.2, 0.4, 0.1, 0.1, 0.05, 0.05][idx]))
+    e_prob.grid(row=1, column=idx+1)
+    entries_prob[demanda] = e_prob
+
+    tk.Label(frame_param, text="Precio").grid(row=2, column=0)
+    e_precio = tk.Entry(frame_param, width=6)
+    e_precio.insert(0, str([100, 100, 100, 80, 80, 80, 80][idx]))
+    e_precio.grid(row=2, column=idx+1)
+    entries_precio[demanda] = e_precio
+
+btn_simular = tk.Button(root, text="Simular", command=ejecutar_simulacion)
+btn_simular.pack(pady=10)
+
+cols = ["Día", "Clientes", "Demanda Total", "Vendidos", "Sobrantes", "Ingresos", "Costo", "Ganancia"]
+tree = ttk.Treeview(root, columns=cols, show="headings")
+for col in cols:
+    tree.heading(col, text=col)
+    tree.column(col, width=120)
+tree.pack(fill=tk.BOTH, expand=True)
+
+root.mainloop()
