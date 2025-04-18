@@ -88,12 +88,13 @@ class SimuladorApp:
         return round(a + rnd * (b - a), 4)
 
     def simular_dia(self, dia, fila_anterior, produccion, demanda_posible, probabilidades, precio_por_demanda):
-        #print(f"🧾 Día {dia} - Producción: {produccion} pastelitos")
+        print(f"🧾 Día {dia} - Producción: {produccion} pastelitos")
         demandas_clientes = []
         rnds_demandas = []
         rnd_clientes = random.random()
-        clientes = int(uniforme(10, 30, rnd_clientes))
-        #print(f"Random generado para clientes: {rnd_clientes} → Clientes: {clientes}")
+        #clientes = int(uniforme(10, 30, rnd_clientes))
+        clientes = 30
+        print(f"Random generado para clientes: {rnd_clientes} → Clientes: {clientes}")
         demanda_total = 0
         ingresos = 0
 
@@ -106,20 +107,20 @@ class SimuladorApp:
             precio = precio_por_demanda[demanda]
             ingresos += min(demanda, produccion - demanda_total) * precio
             demanda_total += demanda
-            if demanda_total >= produccion:
-                break
-
+            #Alternativa en caso de que se demanden mas de los que se produzcan, corta.
+            #if demanda_total >= produccion:
+            #    break
         vendidos = min(demanda_total, produccion)
         sobrantes = max(0, produccion - vendidos)
         costo_unitario = 30
         costo_total = produccion * costo_unitario
         ganancia = ingresos - costo_total
 
-        #print(f"Clientes: {clientes}")
-        #print(f"Demandas generadas: {demandas_clientes}")
-        #precios_asociados = [precio_por_demanda[d] for d in demandas_clientes]
-        #print(f"Precios asociados: {precios_asociados}")
-        #print(f"Randoms usados para demanda: {rnds_demandas}")
+        print(f"Clientes: {clientes}")
+        print(f"Demandas generadas: {demandas_clientes}")
+        precios_asociados = [precio_por_demanda[d] for d in demandas_clientes]
+        print(f"Precios asociados: {precios_asociados}")
+        print(f"Randoms usados para demanda: {rnds_demandas}")
 
         acum_sobrantes = fila_anterior[
                              'Acum. Sobrantes'] + sobrantes if 'Acum. Sobrantes' in fila_anterior else sobrantes
@@ -147,7 +148,7 @@ class SimuladorApp:
     def simular(self):
         self.simular_btn.config(state='disabled')
         self.result_label.config(text='⏳ Simulando...')
-        #print("📦 Precios por unidad según demanda ingresados:")
+        print("📦 Precios por unidad según demanda ingresados:")
         self.tree.delete(*self.tree.get_children())
         try:
             n = int(self.entry_n.get())
