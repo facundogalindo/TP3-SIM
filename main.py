@@ -4,12 +4,10 @@ import random
 from openpyxl import Workbook
 from tkinter import filedialog
 
+
 # Función uniforme global
 def uniforme(a: int, b: int, rnd: float) -> float:
     return round(a + rnd * (b - a), 4)
-
-
-# Función uniforme global
 
 
 class SimuladorApp:
@@ -17,7 +15,6 @@ class SimuladorApp:
         self.root = root
         self.root.title("Simulación de Venta de Pastelitos")
 
-        # ----- FRAME DE PARÁMETROS GENERALES -----
         self.param_frame = tk.Frame(root)
         self.param_frame.pack(pady=10)
 
@@ -36,8 +33,9 @@ class SimuladorApp:
         self.simular_btn = tk.Button(self.param_frame, text="Simular", command=self.simular)
         self.simular_btn.grid(row=0, column=6, padx=10)
         tk.Button(self.param_frame, text="Exportar a Excel", command=self.exportar_excel).grid(row=0, column=7, padx=10)
+        tk.Button(self.param_frame, text="🔍 Ver Detalles", bg="#4CAF50", fg="white", font=("Segoe UI", 9, "bold"),
+                  command=self.mostrar_detalles).grid(row=0, column=8, padx=10)
 
-        # ----- FRAME PARA PARÁMETROS VARIABLES -----
         self.variables_frame = tk.LabelFrame(root, text="Parámetros de Demanda y Precios")
         self.variables_frame.pack(pady=10)
 
@@ -62,7 +60,6 @@ class SimuladorApp:
             e.grid(row=3, column=idx + 1)
             self.precio_entries.append(e)
 
-        # ----- TREEVIEW PARA RESULTADOS -----
         self.tree = ttk.Treeview(root, columns=(
             'Día', 'Clientes', 'Demanda Total', 'Vendidos', 'Sobrantes', 'Acum. Sobrantes', 'Prom. Sobrantes',
             'Producción', 'Costo Total', 'Ingresos', 'Ganancia', 'Acum. Ganancia', 'Prom. Ganancia'), show='headings')
@@ -76,6 +73,11 @@ class SimuladorApp:
         self.tree.configure(yscroll=scrollbar.set)
         scrollbar.pack(side='right', fill='y')
 
+        self.tree.bind("<Button-3>", self.mostrar_menu_contextual)
+
+        self.menu_contextual = tk.Menu(self.root, tearoff=0)
+        self.menu_contextual.add_command(label="Ver detalles", command=self.mostrar_detalle_fila_seleccionada)
+
         self.progress = ttk.Progressbar(root, orient="horizontal", length=400, mode="determinate")
         self.progress.pack(pady=5)
 
@@ -83,44 +85,62 @@ class SimuladorApp:
         self.result_label.pack(pady=10)
 
         self.datos_simulados = []
+        self.detalles_simulados = []
 
-    def uniforme(a: int, b: int, rnd: float) -> float:
-        return round(a + rnd * (b - a), 4)
+    def mostrar_menu_contextual(self, event):
+        item = self.tree.identify_row(event.y)
+        if item:
+            self.tree.selection_set(item)
+            self.menu_contextual.post(event.x_root, event.y_root)
+
+    def mostrar_detalle_fila_seleccionada(self):
+        seleccion = self.tree.selection()
+        if not seleccion:
+            return
+        item = self.tree.item(seleccion[0])
+        valores = item['values']
+        if not valores:
+            return
+        dia = int(valores[0])
+        detalle = self.detalles_simulados[dia - 1]
+
+        detalles_window = tk.Toplevel(self.root)
+        detalles_window.title(f"Detalles Día {dia}")
+        text_area = tk.Text(detalles_window, wrap='word', width=100, height=15)
+        text_area.pack(expand=True, fill='both')
+
+        text_area.insert('end', f"Día {detalle['Día']}\n")
+        text_area.insert('end', f"RNDs: {detalle['RNDs']}\n")
+        text_area.insert('end', f"Demandas: {detalle['Demandas']}\n")
+        text_area.insert('end', f"Precios: {detalle['Precios']}\n")
 
     def simular_dia(self, dia, fila_anterior, produccion, demanda_posible, probabilidades, precio_por_demanda):
-        print(f"🧾 Día {dia} - Producción: {produccion} pastelitos")
         demandas_clientes = []
         rnds_demandas = []
+        precios = []
+
         rnd_clientes = random.random()
-        #clientes = int(uniforme(10, 30, rnd_clientes))
-        clientes = 30
-        print(f"Random generado para clientes: {rnd_clientes} → Clientes: {clientes}")
+        clientes = int(uniforme(10, 31, rnd_clientes))
         demanda_total = 0
         ingresos = 0
 
         for _ in range(clientes):
-
             rnd_demanda = random.random()
-            rnds_demandas.append(rnd_demanda)
             demanda = random.choices(demanda_posible, probabilidades)[0]
-            demandas_clientes.append(demanda)
             precio = precio_por_demanda[demanda]
+
+            rnds_demandas.append(round(rnd_demanda, 4))
+            demandas_clientes.append(demanda)
+            precios.append(precio)
+
             ingresos += min(demanda, produccion - demanda_total) * precio
             demanda_total += demanda
-            #Alternativa en caso de que se demanden mas de los que se produzcan, corta.
-            #if demanda_total >= produccion:
-            #    break
+
         vendidos = min(demanda_total, produccion)
         sobrantes = max(0, produccion - vendidos)
         costo_unitario = 30
         costo_total = produccion * costo_unitario
         ganancia = ingresos - costo_total
-
-        print(f"Clientes: {clientes}")
-        print(f"Demandas generadas: {demandas_clientes}")
-        precios_asociados = [precio_por_demanda[d] for d in demandas_clientes]
-        print(f"Precios asociados: {precios_asociados}")
-        print(f"Randoms usados para demanda: {rnds_demandas}")
 
         acum_sobrantes = fila_anterior[
                              'Acum. Sobrantes'] + sobrantes if 'Acum. Sobrantes' in fila_anterior else sobrantes
@@ -129,7 +149,7 @@ class SimuladorApp:
         prom_sobrantes = acum_sobrantes / dia
         prom_ganancia = acum_ganancia / dia
 
-        return {
+        fila = {
             'Día': dia,
             'Clientes': clientes,
             'Demanda Total': demanda_total,
@@ -145,11 +165,20 @@ class SimuladorApp:
             'Prom. Ganancia': round(prom_ganancia, 2),
         }
 
+        detalles = {
+            'Día': dia,
+            'RNDs': rnds_demandas,
+            'Demandas': demandas_clientes,
+            'Precios': precios
+        }
+
+        return fila, detalles
+
     def simular(self):
         self.simular_btn.config(state='disabled')
         self.result_label.config(text='⏳ Simulando...')
-        print("📦 Precios por unidad según demanda ingresados:")
         self.tree.delete(*self.tree.get_children())
+
         try:
             n = int(self.entry_n.get())
             i = int(self.entry_i.get())
@@ -174,36 +203,53 @@ class SimuladorApp:
 
         demanda_posible = self.demandas
         precio_por_demanda = dict(zip(demanda_posible, precios))
-        for d in demanda_posible:
-            print(f"Demanda {d}: ${precio_por_demanda[d]}")
 
         self.datos_simulados = []
+        self.detalles_simulados = []
         fila_anterior = {'Sobrantes': 0, 'Acum. Sobrantes': 0, 'Acum. Ganancia': 0}
 
         self.progress["maximum"] = n
         for dia in range(1, n + 1):
             produccion = 200
-            fila_actual = self.simular_dia(dia, fila_anterior, produccion, demanda_posible, probabilidades,
-                                           precio_por_demanda)
+            fila_actual, detalles = self.simular_dia(dia, fila_anterior, produccion, demanda_posible, probabilidades,
+                                                     precio_por_demanda)
             self.progress["value"] = dia
             self.root.update_idletasks()
             self.datos_simulados.append(fila_actual)
+            self.detalles_simulados.append(detalles)
             fila_anterior = fila_actual
 
-        for fila in self.datos_simulados[i - 1:j]:
+        for idx, fila in enumerate(self.datos_simulados[i - 1:j]):
             valores = [fila[col] for col in self.tree['columns']]
             self.tree.insert('', 'end', values=valores)
 
         ultima = self.datos_simulados[-1]
-        promedio_sobrantes = ultima['Prom. Sobrantes']
-        promedio_ganancia = ultima['Prom. Ganancia']
+        valores_ultima = [ultima[col] for col in self.tree['columns']]
+        self.tree.insert('', 'end', values=valores_ultima)
 
-        texto_resultado = f"📊 Última fila (Día {ultima['Día']}): Ganancia ${ultima['Ganancia']}, Sobrantes: {ultima['Sobrantes']}\n"
-        texto_resultado += f"Promedio de sobrantes por día: {promedio_sobrantes:.2f} pastelitos\n"
-        texto_resultado += f"Promedio de ganancia por día: ${promedio_ganancia:.2f}"
         self.progress["value"] = 0
-        self.result_label.config(text=texto_resultado)
+        self.result_label.config(text="")
         self.simular_btn.config(state='normal')
+
+    def mostrar_detalles(self):
+        try:
+            i = int(self.entry_i.get())
+            j = int(self.entry_j.get())
+        except ValueError:
+            messagebox.showerror("Error", "Primero realizá una simulación válida.")
+            return
+
+        detalles_window = tk.Toplevel(self.root)
+        detalles_window.title("Detalles de RNDs, Demandas y Precios")
+        text_area = tk.Text(detalles_window, wrap='word', width=100, height=30)
+        text_area.pack(expand=True, fill='both')
+
+        for d in self.detalles_simulados[i - 1:j] + [self.detalles_simulados[-1]]:
+            text_area.insert('end', f"Día {d['Día']}\n")
+            text_area.insert('end', f"RNDs: {d['RNDs']}\n")
+            text_area.insert('end', f"Demandas: {d['Demandas']}\n")
+            text_area.insert('end', f"Precios: {d['Precios']}\n")
+            text_area.insert('end', "-" * 80 + "\n")
 
     def exportar_excel(self):
         if not self.datos_simulados:
@@ -239,3 +285,5 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = SimuladorApp(root)
     root.mainloop()
+
+
