@@ -5,7 +5,6 @@ from openpyxl import Workbook
 from tkinter import filedialog
 
 
-# Función uniforme global
 def uniforme(a: int, b: int, rnd: float) -> float:
     return round(a + rnd * (b - a), 4)
 
@@ -142,8 +141,7 @@ class SimuladorApp:
         costo_total = produccion * costo_unitario
         ganancia = ingresos - costo_total
 
-        acum_sobrantes = fila_anterior[
-                             'Acum. Sobrantes'] + sobrantes if 'Acum. Sobrantes' in fila_anterior else sobrantes
+        acum_sobrantes = fila_anterior['Acum. Sobrantes'] + sobrantes if 'Acum. Sobrantes' in fila_anterior else sobrantes
         acum_ganancia = fila_anterior['Acum. Ganancia'] + ganancia if 'Acum. Ganancia' in fila_anterior else ganancia
 
         prom_sobrantes = acum_sobrantes / dia
@@ -219,13 +217,14 @@ class SimuladorApp:
             self.detalles_simulados.append(detalles)
             fila_anterior = fila_actual
 
-        for idx, fila in enumerate(self.datos_simulados[i - 1:j]):
+        for fila in self.datos_simulados[i - 1:j]:
             valores = [fila[col] for col in self.tree['columns']]
             self.tree.insert('', 'end', values=valores)
 
-        ultima = self.datos_simulados[-1]
-        valores_ultima = [ultima[col] for col in self.tree['columns']]
-        self.tree.insert('', 'end', values=valores_ultima)
+        if j < len(self.datos_simulados):
+            ultima = self.datos_simulados[-1]
+            valores_ultima = [ultima[col] for col in self.tree['columns']]
+            self.tree.insert('', 'end', values=valores_ultima)
 
         self.progress["value"] = 0
         self.result_label.config(text="")
@@ -244,7 +243,15 @@ class SimuladorApp:
         text_area = tk.Text(detalles_window, wrap='word', width=100, height=30)
         text_area.pack(expand=True, fill='both')
 
-        for d in self.detalles_simulados[i - 1:j] + [self.detalles_simulados[-1]]:
+        for d in self.detalles_simulados[i - 1:j]:
+            text_area.insert('end', f"Día {d['Día']}\n")
+            text_area.insert('end', f"RNDs: {d['RNDs']}\n")
+            text_area.insert('end', f"Demandas: {d['Demandas']}\n")
+            text_area.insert('end', f"Precios: {d['Precios']}\n")
+            text_area.insert('end', "-" * 80 + "\n")
+
+        if j < len(self.detalles_simulados):
+            d = self.detalles_simulados[-1]
             text_area.insert('end', f"Día {d['Día']}\n")
             text_area.insert('end', f"RNDs: {d['RNDs']}\n")
             text_area.insert('end', f"Demandas: {d['Demandas']}\n")
@@ -285,5 +292,6 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = SimuladorApp(root)
     root.mainloop()
+
 
 
